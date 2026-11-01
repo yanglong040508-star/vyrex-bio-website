@@ -84,6 +84,32 @@ def me():return jsonify(admin=bool(session.get('admin')),csrf=session.get('csrf'
 @admin_required
 @csrf_required
 def logout():session.clear();return jsonify(ok=True)
+@app.post('/api/change-password')
+@admin_required
+@csrf_required
+def change_password():
+ d=request.get_json(silent=True) or {}
+ current=str(d.get('current_password',''))
+ new=str(d.get('new_password',''))
+ confirm=str(d.get('confirm_password',''))
+ if not current or not new or not confirm:
+  return jsonify(error='请填写当前密码、新密码和确认密码'),400
+ if len(new)<12:
+  return jsonify(error='新密码至少需要12个字符'),400
+ if new!=confirm:
+  return jsonify(error='两次输入的新密码不一致'),400
+ c=db()
+ # This application currently provisions one administrator account.
+ u=c.execute('SELECT id,password_hash FROM users ORDER BY id LIMIT 1').fetchone()
+ if not u or not check_password_hash(u['password_hash'],current):
+  c.close()
+  return jsonify(error='当前密码不正确'),400
+ c.execute('UPDATE users SET password_hash=? WHERE id=?',(generate_password_hash(new),u['id']))
+ c.commit()
+ c.close()
+ session.clear()
+ return jsonify(ok=True,message='密码修改成功，请使用新密码重新登录',relogin=True)
+
 @app.get('/api/contact')
 def get_contact():
  c=db();rows=c.execute("SELECT k,v FROM settings WHERE k IN ('whatsapp','email','phone','telegram','address','hours')").fetchall();c.close()
