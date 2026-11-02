@@ -1,5 +1,4 @@
 
-
 <!doctype html><html lang="zh-CN"><head><script>
 if (location.protocol === 'file:') {
   alert('请不要双击 admin.html。请先运行 START_AND_OPEN_ADMIN.bat，再从 http://127.0.0.1:5000/admin 登录。');
@@ -99,6 +98,13 @@ function inferCategory(line){
  return $('recognizeDefaultCat').value;
 }
 function cleanPrice(v){if(v==null||v==='')return '';const n=String(v).replace(/[$,]/g,'').trim();return /^\d+(\.\d{1,2})?$/.test(n)?n:''}
+function normalizeCatalogSpec(value){
+ const s=String(value||'').replace(/\s+/g,' ').trim();
+ // Product-name text may be merged into the specification column by PDF/OCR.
+ // Keep only the specification beginning at its first numeric strength.
+ const m=s.match(/\d+(?:\.\d+)?\s*(?:mg|mcg|μg|g|ml|iu)\b(?:\s*\/\s*(?:ml|mL))?(?:\s*[-–—×x]\s*\d+(?:\.\d+)?\s*(?:ml|mL|vials?|tabs?|tablets?))?/i);
+ return m ? m[0].replace(/\s+/g,' ').trim() : s;
+}
 function parseRecognizedText(text){
  const lines=String(text||'').replace(/\u00a0/g,' ').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
  const output=[];
@@ -112,7 +118,7 @@ function parseRecognizedText(text){
   // Structured catalog row: CODE | PRODUCT NAME | SPECIFICATION | PRICE/VIAL.
   if(cells.length>=4 && /^[A-Z0-9][A-Z0-9_-]{1,15}$/i.test(cells[0]) && /(?:mg|mcg|ml|iu)\b/i.test(cells[2])){
    // User rule: use CODE as the product name and ignore PRODUCT NAME.
-   name=cells[0];spec=cells[2];unit=cleanPrice(cells[3]);bulk='';
+   name=cells[0];spec=normalizeCatalogSpec(cells[2]);unit=cleanPrice(cells[3]);bulk='';
   }else if(cells.length>=3){
    const ci=cells.findIndex(x=>/^(peptides?|oils?|tablets?|肽类?|油剂?|片剂?)$/i.test(x));
    if(ci>=0){
@@ -142,7 +148,7 @@ function parseRecognizedText(text){
   if(name.length>150)name=name.slice(0,150);
   // Reject obvious headers and broken rows instead of presenting them as products.
   if(name && spec && !/^(PRODUCT PRICE CATALOG|CODE|PRODUCT NAME)$/i.test(name) && !/^USD\s+Page/i.test(spec)){
-   output.push({name,cat:cat||$('recognizeDefaultCat').value,spec,unit_price:unit,bulk_price:bulk});
+   spec=normalizeCatalogSpec(spec);output.push({name,cat:cat||$('recognizeDefaultCat').value,spec,unit_price:unit,bulk_price:bulk});
   }
  }
  const seen=new Set();return output.filter(p=>{const k=[p.name,p.cat,p.spec,p.unit_price,p.bulk_price].join('|').toLowerCase();if(seen.has(k))return false;seen.add(k);return true});
