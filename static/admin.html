@@ -1,11 +1,5 @@
 
-<!doctype html><html lang="zh-CN"><head><script>
-if (location.protocol === 'file:') {
-  alert('请不要双击 admin.html。请先运行 START_AND_OPEN_ADMIN.bat，再从 http://127.0.0.1:5000/admin 登录。');
-  location.replace('http://127.0.0.1:5000/admin');
-}
-</script><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>VYREX BIO 管理后台</title><style>:root{--g:#073d30;--gold:#c5a15b;--line:#d9e3dc}*{box-sizing:border-box}body{margin:0;background:#f3f6f2;color:#193a2e;font:15px system-ui,'Microsoft YaHei',sans-serif}header{background:var(--g);color:white;padding:18px 4%;display:flex;align-items:center;justify-content:space-between}header strong{font-size:23px}header a{color:#e6d399;text-decoration:none;margin-left:18px}main{max-width:1250px;margin:25px auto;padding:0 18px}.card{background:white;border:1px solid var(--line);border-radius:13px;padding:24px;margin-bottom:20px;box-shadow:0 3px 15px #163c2710}h2{margin:0 0 18px}input,select,textarea{pointer-events:auto!important;user-select:text!important;-webkit-user-select:text!important;opacity:1!important;width:100%;border:1px solid #cbd8cf;border-radius:7px;padding:11px;font:inherit;background:white}label{display:block;font-size:13px;color:#5d7065;margin:10px 0 6px}button{border:0;border-radius:7px;background:var(--g);color:white;padding:10px 16px;cursor:pointer;font:inherit}button.secondary{background:#e8efea;color:#183b2b}button.danger{background:#a02c37}button:disabled{opacity:.5}.flex{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.tablewrap{overflow-x:auto}table{border-collapse:collapse;width:100%;min-width:850px}th,td{border-bottom:1px solid #e9ede9;padding:12px;text-align:left;vertical-align:middle}th{background:#f7faf7}img.thumb{width:52px;height:52px;object-fit:cover;border-radius:8px}.muted{color:#697970;font-size:12px}.hidden{display:none!important}.pill{border:1px solid #d6e1d8;border-radius:20px;padding:5px 10px}.tabs button.active{background:var(--gold);color:#153d2b}#login{max-width:420px;margin:10vh auto;position:relative;z-index:2}#password{display:block;position:relative;z-index:3;min-height:44px;cursor:text}#password:focus{outline:3px solid #c5a15b;outline-offset:2px}.password-wrap{position:relative}.password-wrap input{padding-right:80px}.password-wrap button{position:absolute;right:5px;top:5px;font-size:12px;padding:7px;background:#e8efea;color:#183b2b;z-index:4}#loginHint{font-size:13px;color:#5d7065}#message{position:fixed;bottom:22px;right:22px;background:#124d37;color:white;border-radius:8px;padding:14px;display:none;max-width:350px;z-index:5}@media(max-width:650px){.grid{grid-template-columns:1fr}header strong{font-size:17px}}</style></head><body><header><div><strong>VYREX BIO</strong>　中文管理后台</div><div><a href="/" target="_blank">查看英文网站 ↗</a> <a href="#" id="logout" class="hidden">退出</a></div></header><main><section id="login" class="card"><h2>管理员登录</h2><label for="username">账号</label><input id="username" name="username" autocomplete="username" value="admin"><label for="password">密码（点击下方白色输入框）</label><div class="password-wrap"><input id="password" name="password" type="password" autocomplete="current-password" placeholder="请输入 FIRST_LOGIN.txt 中的密码" aria-label="管理员密码"><button id="togglePassword" type="button" aria-label="显示或隐藏密码">显示</button></div><p id="loginHint">若点击后不能输入，请按 Tab 键切换到密码框，或刷新 Ctrl+F5。</p><p><button id="loginBtn" type="button">安全登录</button></p><p class="muted">首次登录密码见压缩包的 FIRST_LOGIN.txt；仅供本地演示。</p></section><div id="app" class="hidden"><div class="card"><div class="flex tabs"><button data-tab="products" class="active">产品与价格管理</button><button data-tab="inquiries">客户询价管理</button><button data-tab="contact">联系方式管理</button><button data-tab="security">账号安全</button><span class="muted">产品修改保存后，英文网站刷新即可更新。</span></div></div><section id="productsTab"><div class="card"><h2 id="formTitle">新增产品</h2><form id="productForm"><input type="hidden" id="pid"><div class="grid"><div><label>产品代码 *</label><div class="flex" style="gap:6px;flex-wrap:nowrap"><input id="code" required maxlength="32" placeholder="点击右侧自动生成" style="flex:1;min-width:0"><button type="button" id="generateCode" class="secondary" style="white-space:nowrap">自动生成</button></div><p class="muted">自动生成未使用的六位数字代码，也可以手动修改。</p></div><div><label>英文产品名称 *</label><input id="name" required maxlength="150" placeholder="Product Name"></div><div><label>分类 *</label><select id="cat"><option value="Peptides">肽类 Peptides</option><option value="Oils">油剂 Oils</option><option value="Tablets">片剂 Tablets</option></select></div><div><label>规格 *</label><input id="spec" required maxlength="160" placeholder="10mg × 10 vials"></div><div><label>单瓶/单盒美元价格（可不填）</label><input id="unit_price" type="number" step="0.01" min="0" placeholder="留空表示询价"></div><div><label>整盒/批量美元价格（可不填）</label><input id="bulk_price" type="number" step="0.01" min="0" placeholder="10瓶/10盒价格"></div></div><p><label><input id="visible" type="checkbox" checked style="width:auto"> 在客户网站公开显示</label></p><div class="flex"><button type="submit" id="saveProductBtn">保存产品</button><button type="button" id="saveAndNext" class="secondary">保存并继续添加下一款</button><button type="button" class="secondary" id="clearProductForm">清空 / 新增</button></div><p class="muted">建议流程：先填写代码、名称、分类和规格，再填写价格；价格暂时没有可以留空。保存后产品会出现在下方列表。连续添加多款时，使用“保存并继续添加下一款”。</p></form></div><div class="card" id="autoRecognizeCard">
-<h2>自动识别产品资料</h2>
+
 <!doctype html><html lang="zh-CN"><head><script>
 if (location.protocol === 'file:') {
   alert('请不要双击 admin.html。请先运行 START_AND_OPEN_ADMIN.bat，再从 http://127.0.0.1:5000/admin 登录。');
@@ -117,7 +111,8 @@ function parseRecognizedText(text){
   let name='',cat=$('recognizeDefaultCat').value,spec='',unit='',bulk='';
   // Structured catalog row: CODE | PRODUCT NAME | SPECIFICATION | PRICE/VIAL.
   if(cells.length>=4 && /^[A-Z0-9][A-Z0-9_-]{1,15}$/i.test(cells[0]) && /(?:mg|mcg|ml|iu)\b/i.test(cells[2])){
-   name=cells[1];spec=cells[2];unit=cleanPrice(cells[3]);bulk='';
+   // User rule: use CODE as the product name and ignore PRODUCT NAME.
+   name=cells[0];spec=cells[2];unit=cleanPrice(cells[3]);bulk='';
   }else if(cells.length>=3){
    const ci=cells.findIndex(x=>/^(peptides?|oils?|tablets?|肽类?|油剂?|片剂?)$/i.test(x));
    if(ci>=0){
@@ -204,187 +199,6 @@ async function extractImage(file){
   });
   return cols.join(' | ');
  }).join('\n');
-}
-$('recognizeClearBtn').onclick=()=>{$('recognizePaste').value='';$('recognizeFile').value='';$('recognizeStatus').textContent='';$('recognizePreview').classList.add('hidden');recognizedProducts=[]};
-$('recognizeRetryBtn').onclick=()=>$('recognizeBtn').click();
-$('recognizeBtn').onclick=async()=>{
- const btn=$('recognizeBtn');btn.disabled=true;$('recognizeStatus').textContent='正在读取资料…';
- try{
-  let text=$('recognizePaste').value.trim();const f=$('recognizeFile').files[0];
-  if(f){
-   const ext=f.name.split('.').pop().toLowerCase();
-   if(ext==='pdf')text+='\n'+await extractPdf(f);
-   else if(['xlsx','xls','csv'].includes(ext)){
-    if(ext==='csv')text+='\n'+await f.text();else text+='\n'+await extractExcel(f);
-   }else if(/^image\//.test(f.type))text+='\n'+await extractImage(f);
-   else throw new Error('暂不支持该文件格式');
-  }
-  if(!text.trim())throw new Error('请上传文件或粘贴产品资料');
-  recognizedProducts=parseRecognizedText(text);
-  if(!recognizedProducts.length)throw new Error('没有识别到完整的产品名称和规格。请尝试粘贴表格文字，或检查图片清晰度。');
-  $('recognizeRows').innerHTML=recognizedProducts.map(p=>`<tr><td>${esc(p.name)}</td><td>${esc(p.cat)}</td><td>${esc(p.spec)}</td><td>${p.unit_price?'$'+esc(p.unit_price):'询价'}</td><td>${p.bulk_price?'$'+esc(p.bulk_price):'询价'}</td></tr>`).join('');
-  $('recognizePreview').classList.remove('hidden');$('recognizeStatus').textContent=`识别完成：${recognizedProducts.length} 款。请核对预览后再转入批量添加。`;
- }catch(e){$('recognizeStatus').textContent=e.message;msg(e.message)}
- finally{btn.disabled=false}
-};
-$('recognizeApplyBtn').onclick=()=>{
- if(!recognizedProducts.length)return;
- $('batchProducts').value=recognizedProducts.map(p=>[p.name,p.cat,p.spec,p.unit_price,p.bulk_price].join(' | ')).join('\n');
- $('batchProducts').scrollIntoView({behavior:'smooth',block:'center'});
- msg(`已转入批量添加区，共 ${recognizedProducts.length} 款；请检查后手动点击批量添加。`);
-};
-
-start().then(()=>{if(!$('pid').value&&!$('code').value)$('code').value=generateUniqueCode()}).catch(e=>msg(e.message));
-let contacts=[];const contactTypes=['WhatsApp','Telegram','Email','Phone','Website','Other'];function contactCard(c,i){return `<div class="card contact-item" data-index="${i}" style="margin:12px 0;padding:16px"><div class="flex" style="justify-content:space-between"><b>联系方式 #${i+1}</b><div class="flex"><button type="button" class="secondary" data-up="${i}" ${i===0?'disabled':''}>上移</button><button type="button" class="secondary" data-down="${i}" ${i===contacts.length-1?'disabled':''}>下移</button><button type="button" class="danger" data-remove="${i}">删除</button></div></div><div class="grid"><div><label>类型</label><select data-field="kind" data-index="${i}">${contactTypes.map(t=>`<option ${c.kind===t?'selected':''} value="${t}">${t}</option>`).join('')}</select></div><div><label>显示名称</label><input data-field="label" data-index="${i}" maxlength="80" value="${esc(c.label||'')}" placeholder="例如 Sales WhatsApp"></div><div><label>号码 / 用户名 / 邮箱 / 链接</label><input data-field="value" data-index="${i}" maxlength="300" value="${esc(c.value||'')}" placeholder="按类型填写"></div></div><div class="flex" style="margin-top:12px"><label style="margin:0"><input type="radio" name="primaryContact" data-primary="${i}" ${c.is_primary?'checked':''} style="width:auto"> 设为主要联系方式</label><label style="margin:0"><input type="checkbox" data-visible="${i}" ${c.visible!==false?'checked':''} style="width:auto"> 在英文网站公开显示</label></div></div>`}function renderContacts(){$('contactList').innerHTML=contacts.map(contactCard).join('')||'<p class="muted">尚未添加联系方式。点击“添加联系方式”开始添加。</p>'}function addContact(){contacts.push({kind:'WhatsApp',label:'WhatsApp',value:'',is_primary:contacts.length===0,visible:true});renderContacts()}async function loadContact(){try{let d=await api('/contact');contacts=(d.contacts||[]).map(x=>({...x}));renderContacts()}catch(e){msg(e.message)}}$('addContact').onclick=addContact;$('addContactBottom').onclick=addContact;$('contactList').oninput=e=>{let el=e.target,i=Number(el.dataset.index);if(!Number.isInteger(i)||!contacts[i])return;if(el.dataset.field)contacts[i][el.dataset.field]=el.value;if(el.dataset.visible!==undefined)contacts[i].visible=el.checked};$('contactList').onchange=e=>{let el=e.target,i=Number(el.dataset.index);if(el.dataset.field&&contacts[i])contacts[i][el.dataset.field]=el.value;if(el.dataset.visible!==undefined&&contacts[i])contacts[i].visible=el.checked;if(el.dataset.primary!==undefined){contacts.forEach((c,j)=>c.is_primary=j===Number(el.dataset.primary));renderContacts()}};$('contactList').onclick=e=>{let b=e.target.closest('button');if(!b)return;let i=Number(b.dataset.remove??b.dataset.up??b.dataset.down);if(b.dataset.remove!==undefined){contacts.splice(i,1);if(contacts.length&&!contacts.some(c=>c.is_primary))contacts[0].is_primary=true;renderContacts()}else if(b.dataset.up!==undefined&&i>0){[contacts[i-1],contacts[i]]=[contacts[i],contacts[i-1]];renderContacts()}else if(b.dataset.down!==undefined&&i<contacts.length-1){[contacts[i+1],contacts[i]]=[contacts[i],contacts[i+1]];renderContacts()}};$('saveContacts').onclick=async()=>{try{const payload=contacts.map(c=>({kind:c.kind,label:c.label,value:c.value,is_primary:!!c.is_primary,visible:c.visible!==false}));let d=await api('/contact',{method:'PUT',body:JSON.stringify({contacts:payload})});msg(`已保存 ${d.count} 项联系方式；英文网站公开内容已更新`);await loadContact()}catch(e){msg(e.message)}};</script></body></html>
-
-<p class="muted">支持 PDF、Excel（.xlsx/.xls/.csv）、图片（PNG/JPG/WebP）和直接粘贴文字。识别后先预览、核对，再转入批量添加；不会自动写入数据库。</p>
-<div class="grid">
- <div><label>上传 PDF / Excel / 图片</label><input id="recognizeFile" type="file" accept=".pdf,.xlsx,.xls,.csv,image/png,image/jpeg,image/webp"></div>
- <div><label>无法识别分类时的默认分类</label><select id="recognizeDefaultCat"><option value="Peptides">肽类 Peptides</option><option value="Oils">油剂 Oils</option><option value="Tablets">片剂 Tablets</option></select></div>
- <div><label>识别方式</label><select id="recognizeMode"><option value="auto">自动识别</option><option value="text">仅提取文字（PDF/Excel）</option><option value="ocr">图片 OCR 识别</option></select></div>
-</div>
-<label>直接粘贴产品资料</label>
-<textarea id="recognizePaste" rows="5" placeholder="可粘贴目录文字、表格内容或多行产品清单。支持名称、分类、规格、单价、整盒价。"></textarea>
-<div class="flex" style="margin-top:12px">
- <button type="button" id="recognizeBtn">识别并生成预览</button>
- <button type="button" class="secondary" id="recognizeClearBtn">清空</button>
-</div>
-<div id="recognizeStatus" class="muted" style="margin-top:10px"></div>
-<div id="recognizePreview" class="hidden" style="margin-top:14px">
- <h3 style="margin:8px 0">识别结果预览</h3>
- <p class="muted">请检查名称、分类、规格和价格。识别不确定的内容可在下方批量文本框中修改。确认后点击“转入批量添加”，再由你决定是否保存。</p>
- <div class="tablewrap"><table style="min-width:700px"><thead><tr><th>产品名称</th><th>分类</th><th>规格</th><th>单价</th><th>整盒价</th></tr></thead><tbody id="recognizeRows"></tbody></table></div>
- <div class="flex" style="margin-top:12px"><button type="button" id="recognizeApplyBtn">转入批量添加</button><button type="button" class="secondary" id="recognizeRetryBtn">重新识别</button></div>
-</div>
-</div>
-<div class="card"><h2>批量添加产品</h2><p class="muted">每行一款产品，按以下顺序填写：英文名称 | 分类 | 规格 | 单价 | 批量价。产品代码由系统自动生成并检查重复。分类填写 Peptides、Oils 或 Tablets；价格可留空。</p><textarea id="batchProducts" rows="6" placeholder="Retatrutide 20mg | Peptides | 20mg × 10 vials | 12.5 | 125&#10;Testosterone Cypionate 250mg | Oils | 250mg/ml × 10ml | 18 | 180&#10;Anavar 10mg | Tablets | 10mg × 100 tablets | 9 | 90"></textarea><div class="flex" style="margin-top:12px"><button type="button" id="batchAddBtn">批量添加并自动编号</button><button type="button" class="secondary" id="batchClearBtn">清空批量内容</button></div><p class="muted">系统会一次性保存全部有效行；如果某行格式不正确，整批不会写入，避免只保存一半。</p></div><div class="card"><div class="flex" style="justify-content:space-between"><h2>产品列表 <span id="productCount"></span></h2><input id="filter" placeholder="搜索产品代码、名称、规格" style="max-width:300px"></div><div class="tablewrap"><table><thead><tr><th>图片</th><th>产品</th><th>分类/规格</th><th>价格（USD）</th><th>资料</th><th>状态</th><th>操作</th></tr></thead><tbody id="productRows"></tbody></table></div></div></section><section id="inquiriesTab" class="card hidden"><h2>客户询价单</h2><p class="muted">客户在英文网站提交的询价在这里显示。本系统不发送邮件通知。</p><div id="inquiryRows"></div></section><section id="contactTab" class="card hidden"><div class="flex" style="justify-content:space-between"><div><h2>联系方式管理</h2><p class="muted">可添加多个 WhatsApp、Telegram、邮箱及其他联系方式。勾选公开后会显示在英文网站；客户点击可直接联系。</p></div><button type="button" id="addContact">＋ 添加联系方式</button></div><div id="contactList"></div><div class="flex" style="margin-top:18px"><button type="button" id="saveContacts">保存全部联系方式</button><button type="button" class="secondary" id="addContactBottom">＋ 再添加一项</button></div><p class="muted">拖动顺序暂不启用；使用每项的上移/下移按钮调整显示顺序。删除后点击保存才会生效。</p></section><section id="securityTab" class="card hidden"><h2>账号安全设置</h2><p class="muted">修改管理员密码。新密码至少12个字符，修改成功后系统会退出登录，请使用新密码重新登录。</p><form id="passwordForm" autocomplete="off"><div style="max-width:520px"><label for="currentPassword">当前密码</label><input id="currentPassword" type="password" autocomplete="current-password" required><label for="newPassword">新密码（至少12位）</label><input id="newPassword" type="password" autocomplete="new-password" minlength="12" required><label for="confirmPassword">确认新密码</label><input id="confirmPassword" type="password" autocomplete="new-password" minlength="12" required><p><button type="submit">保存新密码</button></p></div></form></section></div></main><div id="message"></div><script>
-let csrf='',products=[],inquiries=[];const $=id=>document.getElementById(id);const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));function msg(s){$('message').textContent=s;$('message').style.display='block';setTimeout(()=>$('message').style.display='none',3500)}async function api(path,opts={}){let r=await fetch('/api'+path,{...opts,headers:{...(opts.body instanceof FormData?{}:{'Content-Type':'application/json'}),'X-CSRF-Token':csrf,...(opts.headers||{})}});let d=await r.json();if(!r.ok)throw Error(d.error||'操作失败');return d}async function start(){let u=await api('/me');if(u.admin){csrf=u.csrf;$('login').classList.add('hidden');$('app').classList.remove('hidden');$('logout').classList.remove('hidden');await load();await loadContact()}}async function load(){products=await api('/products');renderProducts();inquiries=await api('/inquiries');renderInquiries()}$('loginBtn').onclick=async()=>{try{let d=await api('/login',{method:'POST',body:JSON.stringify({username:$('username').value,password:$('password').value})});csrf=d.csrf;await start()}catch(e){msg(e.message)}};$('password').onkeydown=e=>{if(e.key==='Enter')$('loginBtn').click()};$('togglePassword').onclick=()=>{let p=$('password'),show=p.type==='password';p.type=show?'text':'password';$('togglePassword').textContent=show?'隐藏':'显示';p.focus()};$('logout').onclick=async e=>{e.preventDefault();await api('/logout',{method:'POST'});location.reload()};document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('active',x===b));$('productsTab').classList.toggle('hidden',b.dataset.tab!=='products');$('inquiriesTab').classList.toggle('hidden',b.dataset.tab!=='inquiries');$('contactTab').classList.toggle('hidden',b.dataset.tab!=='contact');$('securityTab').classList.toggle('hidden',b.dataset.tab!=='security')});function generateUniqueCode(){
- const used=new Set(products.map(p=>String(p.code||'').trim().toUpperCase()));
- const numeric=products.map(p=>String(p.code||'').trim()).filter(c=>/^\\d{6}$/.test(c)).map(Number);
- let candidate=numeric.length?Math.max(...numeric)+1:630001;
- while(candidate<=999999&&used.has(String(candidate)))candidate++;
- if(candidate>999999){let n=1;while(used.has('P'+String(n).padStart(5,'0')))n++;return 'P'+String(n).padStart(5,'0')}
- return String(candidate).padStart(6,'0');
-}
-function resetForm(){
- const form=$('productForm');
- // The button with id="reset" is a named property on the form and can shadow form.reset().
- // Call the native HTMLFormElement method directly to avoid "$(…).reset is not a function".
- HTMLFormElement.prototype.reset.call(form);
- $('pid').value='';
- $('formTitle').textContent='新增产品';
- $('saveProductBtn').textContent='保存产品';
- $('code').value=generateUniqueCode();
- $('visible').checked=true;
-}
-$('generateCode').onclick=()=>{$('code').value=generateUniqueCode();$('code').focus()};$('clearProductForm').onclick=()=>{resetForm();$('code').focus()};async function saveProduct(continueAdd=false){
- let id=$('pid').value;
- let d={code:$('code').value.trim().toUpperCase(),name:$('name').value.trim(),spec:$('spec').value.trim(),cat:$('cat').value,unit_price:$('unit_price').value,bulk_price:$('bulk_price').value,visible:$('visible').checked};
- if(!d.code||!d.name||!d.spec){msg('请先填写产品代码、英文名称和规格');return}
- const duplicate=products.find(p=>String(p.code).toUpperCase()===d.code&&String(p.id)!==String(id));
- if(duplicate){msg('产品代码已存在，请检查代码或编辑已有产品');$('code').focus();return}
- const buttons=[$('saveProductBtn'),$('saveAndNext')];buttons.forEach(b=>b.disabled=true);
- try{
-  await api('/products'+(id?'/'+id:''),{method:id?'PUT':'POST',body:JSON.stringify(d)});
-  msg(id?'产品修改成功':'产品添加成功');
-  await load();
-  resetForm();
-  if(continueAdd){$('code').focus();window.scrollTo({top:0,behavior:'smooth'});}
- }catch(err){msg(err.message)}
- finally{buttons.forEach(b=>b.disabled=false)}
-}
-$('batchClearBtn').onclick=()=>$('batchProducts').value='';
-$('batchAddBtn').onclick=async()=>{
- const raw=$('batchProducts').value.trim();if(!raw){msg('请先粘贴批量产品内容');return}
- const rows=raw.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);const items=[];
- for(let i=0;i<rows.length;i++){
-  const parts=rows[i].split('|').map(x=>x.trim());
-  if(parts.length<3||parts.length>5){msg(`第${i+1}行格式不正确，请按 名称 | 分类 | 规格 | 单价 | 批量价 填写`);return}
-  const catMap={'肽类':'Peptides','肽':'Peptides','油剂':'Oils','油':'Oils','片剂':'Tablets'};
-  const cat=catMap[parts[1]]||parts[1];
-  if(!['Peptides','Oils','Tablets'].includes(cat)){msg(`第${i+1}行分类必须是 Peptides、Oils 或 Tablets`);return}
-  items.push({name:parts[0],cat,spec:parts[2],unit_price:parts[3]||'',bulk_price:parts[4]||'',visible:true});
- }
- const b=$('batchAddBtn');b.disabled=true;
- try{const result=await api('/products/batch',{method:'POST',body:JSON.stringify({products:items})});await load();$('batchProducts').value='';msg(`批量添加成功：${result.count} 款。代码：${result.products.map(p=>p.code).join('、')}`);}
- catch(e){msg(e.message)}finally{b.disabled=false}
-};
-$('productForm').onsubmit=async e=>{e.preventDefault();await saveProduct(false)};
-$('saveAndNext').onclick=()=>saveProduct(true);function renderProducts(){let f=$('filter').value.toLowerCase();let rows=products.filter(p=>(p.code+' '+p.name+' '+p.spec).toLowerCase().includes(f));$('productCount').textContent='('+products.length+')';$('productRows').innerHTML=rows.map(p=>`<tr><td>${p.image?`<img class="thumb" src="${esc(p.image)}">`:'—'}</td><td><b>${esc(p.code)}</b><div>${esc(p.name)}</div></td><td>${esc(p.cat)}<div class="muted">${esc(p.spec)}</div></td><td>单价：${p.unit_price===null?'询价':'$'+p.unit_price}<div class="muted">批量：${p.bulk_price===null?'询价':'$'+p.bulk_price}</div></td><td>${p.coa?`<a href="${esc(p.coa)}" target="_blank">查看 COA</a>`:'未上传'}</td><td>${p.visible?'已上架':'已隐藏'}</td><td><div class="flex"><button class="secondary" data-edit="${p.id}">编辑</button><button class="secondary" data-upload="${p.id}" data-kind="image">上传图片</button><button class="secondary" data-upload="${p.id}" data-kind="coa">上传 COA</button><button class="danger" data-delete="${p.id}">删除</button></div></td></tr>`).join('')||'<tr><td colspan="7">暂时没有产品，先新增一款。</td></tr>'} $('filter').oninput=renderProducts;$('productRows').onclick=async e=>{let b=e.target.closest('button');if(!b)return;let id=Number(b.dataset.edit||b.dataset.upload||b.dataset.delete),p=products.find(x=>x.id===id);if(!p)return;if(b.dataset.edit){for(let k of ['code','name','spec','cat','unit_price','bulk_price'])$(k).value=p[k]??'';$('pid').value=id;$('visible').checked=!!p.visible;$('formTitle').textContent='编辑产品：'+p.code;$('saveProductBtn').textContent='保存修改';window.scrollTo({top:0,behavior:'smooth'})}if(b.dataset.delete){if(!confirm('确认删除 '+p.code+'？历史询价记录仍保留。'))return;try{await api('/products/'+id,{method:'DELETE'});await load();msg('已删除')}catch(e){msg(e.message)}}if(b.dataset.upload){let input=document.createElement('input');input.type='file';input.accept=b.dataset.kind==='image'?'image/png,image/jpeg,image/webp':'application/pdf';input.onchange=async()=>{let fd=new FormData();fd.append('file',input.files[0]);try{await api('/products/'+id+'/upload/'+b.dataset.kind,{method:'POST',body:fd});msg('上传成功');await load()}catch(e){msg(e.message)}};input.click()}};function renderInquiries(){$('inquiryRows').innerHTML=inquiries.map(i=>`<div style="border:1px solid #dbe6dd;border-radius:10px;padding:18px;margin-bottom:14px"><div class="flex" style="justify-content:space-between"><b>询价 #${i.id} · ${esc(i.customer_name)}</b><span class="muted">${esc(i.created_at)}</span></div><p>邮箱：${esc(i.email)}　　状态：<select data-status="${i.id}" style="width:160px"><option value="new" ${i.status==='new'?'selected':''}>新询价</option><option value="processing" ${i.status==='processing'?'selected':''}>处理中</option><option value="closed" ${i.status==='closed'?'selected':''}>已完成</option></select></p><p>留言：${esc(i.message)||'无'}</p><div>${i.items.map(p=>`<div>${esc(p.code)} × ${p.qty} — ${esc(p.name)} — ${esc(p.spec)}</div>`).join('')}</div></div>`).join('')||'<p>暂无客户询价。</p>'}$('inquiryRows').onchange=async e=>{if(!e.target.dataset.status)return;try{await api('/inquiries/'+e.target.dataset.status,{method:'PATCH',body:JSON.stringify({status:e.target.value})});msg('状态已更新')}catch(err){msg(err.message)}};$('passwordForm').onsubmit=async e=>{e.preventDefault();let current=$('currentPassword').value,newp=$('newPassword').value,confirm=$('confirmPassword').value;if(newp.length<12){msg('新密码至少需要12个字符');return}if(newp!==confirm){msg('两次输入的新密码不一致');return}try{let d=await api('/change-password',{method:'POST',body:JSON.stringify({current_password:current,new_password:newp,confirm_password:confirm})});msg(d.message||'密码修改成功，请重新登录');setTimeout(()=>location.reload(),1200)}catch(err){msg(err.message)}};
-// Product catalog import: PDF text, Excel rows, image OCR and pasted text.
-// Recognition is preview-only; saving still uses the existing batch endpoint.
-let recognizedProducts=[];
-function loadExternalScript(url){
- return new Promise((resolve,reject)=>{
-  const existing=[...document.scripts].find(s=>s.src===url);
-  if(existing){if(existing.dataset.loaded==='1')return resolve();existing.addEventListener('load',resolve,{once:true});existing.addEventListener('error',reject,{once:true});return;}
-  const s=document.createElement('script');s.src=url;s.onload=()=>{s.dataset.loaded='1';resolve()};s.onerror=()=>reject(new Error('识别组件加载失败，请检查网络后重试'));document.head.appendChild(s);
- });
-}
-function inferCategory(line){
- const s=line.toLowerCase();
- if(/\b(oils?|oil|injection|testosterone|trenbolone|nandrolone|primobolan|deca)\b/.test(s)||/油剂|油类/.test(s))return 'Oils';
- if(/\b(tablets?|tabs?|capsules?)\b/.test(s)||/片剂|片/.test(s))return 'Tablets';
- if(/\b(peptides?|vials?|reta|tirzepatide|semaglutide|cjc|ipamorelin|bpc|tb-500)\b/.test(s)||/肽类|肽/.test(s))return 'Peptides';
- return $('recognizeDefaultCat').value;
-}
-function cleanPrice(v){if(v==null||v==='')return '';const n=String(v).replace(/[$,]/g,'').trim();return /^\d+(\.\d{1,2})?$/.test(n)?n:''}
-function parseRecognizedText(text){
- const lines=String(text||'').replace(/\u00a0/g,' ').split(/\r?\n/).map(x=>x.trim()).filter(x=>x&& !/^(product\s*name|产品名称|产品目录|catalog|price\s*list|page\s*\d+)/i.test(x));
- const output=[];
- for(const line0 of lines){
-  let line=line0.replace(/[•●▪]/g,' ').trim();
-  let cells=line.split(/\s*\|\s*|\t+|;+/).map(x=>x.trim()).filter(Boolean);
-  let name='',cat='',spec='',unit='',bulk='';
-  if(cells.length>=3){
-   // Canonical order: name | category | specification | unit price | bulk price.
-   const ci=cells.findIndex(x=>/^(peptides?|oils?|tablets?|肽类?|油剂?|片剂?)$/i.test(x));
-   if(ci>=0){
-    name=cells.slice(0,ci).join(' ').trim();cat=inferCategory(cells[ci]);spec=cells[ci+1]||'';
-    const prices=cells.slice(ci+2).map(cleanPrice).filter(x=>x!=='');unit=prices[0]||'';bulk=prices[1]||'';
-   }else{name=cells[0];spec=cells[1]||'';unit=cleanPrice(cells[2]);bulk=cleanPrice(cells[3]);cat=inferCategory(line)}
-  }
-  if(!name||!spec){
-   // Fallback for ordinary catalog lines: extract spec and trailing prices from free text.
-   const priceMatches=[...line.matchAll(/(?:\$\s*)?(\d+(?:\.\d{1,2})?)(?=\s*(?:USD|美元|$|\s))/gi)];
-   const prices=priceMatches.map(m=>cleanPrice(m[1])).filter(Boolean);
-   if(prices.length){bulk=prices.length>1?prices[prices.length-1]:'';unit=prices.length>1?prices[prices.length-2]:prices[0]}
-   const specMatch=line.match(/\b\d+(?:\.\d+)?\s*(?:mg|mcg|μg|g|ml|mL|iu)\b(?:\s*[×x*]\s*\d+\s*(?:vials?|tabs?|tablets?|bottles?|盒|瓶))?/i)
-     || line.match(/\b\d+\s*(?:vials?|tablets?|tabs?)\b/i);
-   if(specMatch)spec=specMatch[0].trim();
-   let rest=line;
-   if(specMatch)rest=rest.replace(specMatch[0],' ');
-   if(prices.length)rest=rest.replace(/(?:\$\s*)?\d+(?:\.\d{1,2})?(?:\s*USD)?/gi,' ');
-   rest=rest.replace(/\b(Peptides?|Oils?|Tablets?)\b/ig,' ').replace(/肽类?|油剂?|片剂?/g,' ').replace(/\s+/g,' ').trim();
-   name=rest.replace(/^[-:：,，]+|[-:：,，]+$/g,'').trim();
-   cat=inferCategory(line);
-  }
-  if(name&&spec){
-   name=name.replace(/^[\s\-–—:：]+|[\s\-–—:：]+$/g,'');
-   if(name.length>150)name=name.slice(0,150);
-   output.push({name,cat:cat||inferCategory(line),spec,unit_price:unit,bulk_price:bulk});
-  }
- }
- // Remove duplicate lines while preserving order.
- const seen=new Set();return output.filter(p=>{const k=[p.name,p.cat,p.spec,p.unit_price,p.bulk_price].join('|').toLowerCase();if(seen.has(k))return false;seen.add(k);return true});
-}
-async function extractPdf(file){
- await loadExternalScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
- pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
- const doc=await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;let out=[];
- for(let n=1;n<=doc.numPages;n++){const page=await doc.getPage(n);const content=await page.getTextContent();out.push(content.items.map(x=>x.str).join('  '))}
- return out.join('\n');
-}
-async function extractExcel(file){
- await loadExternalScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
- const wb=XLSX.read(await file.arrayBuffer(),{type:'array'});let out=[];
- wb.SheetNames.forEach(n=>{const rows=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:false,defval:''});rows.forEach(r=>{const vals=r.map(x=>String(x).trim()).filter(Boolean);if(vals.length)out.push(vals.join(' | '))})});
- return out.join('\n');
-}
-async function extractImage(file){
- await loadExternalScript('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js');
- const result=await Tesseract.recognize(file,'eng+chi_sim',{logger:m=>{if(m.status)$('recognizeStatus').textContent='图片识别中：'+m.status+(m.progress?' '+Math.round(m.progress*100)+'%':'')}});
- return result.data.text||'';
 }
 $('recognizeClearBtn').onclick=()=>{$('recognizePaste').value='';$('recognizeFile').value='';$('recognizeStatus').textContent='';$('recognizePreview').classList.add('hidden');recognizedProducts=[]};
 $('recognizeRetryBtn').onclick=()=>$('recognizeBtn').click();
