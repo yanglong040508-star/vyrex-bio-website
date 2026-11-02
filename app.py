@@ -217,13 +217,68 @@ def valid_product(d):
   if not 0<=n<=10000000:raise ValueError('价格范围无效')
   return round(n,2)
  return (code,name,spec,cat,price('unit_price'),price('bulk_price'),int(bool(d.get('visible',True))))
+def next_product_code(c):
+ # Generate a six-digit numeric code that is not already present in the database.
+ # Starting at 630001 preserves the existing VYREX product-code convention.
+ rows=c.execute("SELECT code FROM products").fetchall()
+ used={str(r['code']).strip().upper() for r in rows}
+ numeric=[]
+ for code in used:
+  if code.isdigit():
+   numeric.append(int(code))
+ candidate=max([630000]+numeric)+1
+ while f"{candidate:06d}" in used:
+  candidate+=1
+ return f"{candidate:06d}"
+
+@app.get('/api/products/next-code')
+@admin_required
+def get_next_product_code():
+ c=db()
+ try:
+  code=next_product_code(c)
+  return jsonify(code=code)
+ finally:
+  c.close()
+
 @app.post('/api/products')
 @admin_required
 @csrf_required
 def add_product():
+ c=None
  try:
-  v=valid_product(request.get_json() or {});c=db();cur=c.execute('INSERT INTO products(code,name,spec,cat,unit_price,bulk_price,visible) VALUES(?,?,?,?,?,?,?)',v);c.commit();pid=cur.lastrowid;c.close();return jsonify(id=pid)
- except (ValueError,sqlite3.IntegrityError) as e:return jsonify(error=str(e)),400
+  d=request.get_json(silent=True) or {}
+  v=list(valid_product(d))
+  c=db()
+  # Serialize code selection and insertion so simultaneous requests cannot
+  # receive the same generated code.
+  c.execute('BEGIN IMMEDIATE')
+  exists=c.execute('SELECT 1 FROM products WHERE UPPER(code)=UPPER(?)',(v[0],)).fetchone()
+  auto_code=bool(d.get('auto_code')) or not v[0] or bool(exists)
+  if auto_code:
+   v[0]=next_product_code(c)
+  cur=c.execute(
+   'INSERT INTO products(code,name,spec,cat,unit_price,bulk_price,visible) VALUES(?,?,?,?,?,?,?)',
+   tuple(v)
+  )
+  pid=cur.lastrowid
+  c.commit()
+  return jsonify(id=pid,code=v[0],code_was_auto_assigned=auto_code)
+ except ValueError as e:
+  if c:
+   c.rollback()
+  return jsonify(error=str(e)),400
+ except sqlite3.IntegrityError:
+  if c:
+   c.rollback()
+  return jsonify(error='产品代码发生冲突，请重新点击自动生成后保存'),409
+ except sqlite3.OperationalError:
+  if c:
+   c.rollback()
+  return jsonify(error='数据库暂时繁忙，请稍后重试；现有数据未被删除'),503
+ finally:
+  if c:
+   c.close()
 @app.put('/api/products/<int:pid>')
 @admin_required
 @csrf_required
