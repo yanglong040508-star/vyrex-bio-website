@@ -1,3 +1,4 @@
+
 import os, sqlite3, secrets, json, hmac, hashlib, time
 from pathlib import Path
 from functools import wraps
@@ -17,7 +18,7 @@ app.config.update(MAX_CONTENT_LENGTH=12*1024*1024, SESSION_COOKIE_HTTPONLY=True,
 CATS=('Peptides','Oils','Tablets')
 
 def db():
- c=sqlite3.connect(DB);c.row_factory=sqlite3.Row;return c
+ c=sqlite3.connect(DB, timeout=30);c.execute('PRAGMA busy_timeout=30000');c.row_factory=sqlite3.Row;return c
 
 def init():
  c=db();c.executescript('''CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY,username TEXT UNIQUE,password_hash TEXT);
@@ -69,13 +70,33 @@ def home():return app.send_static_file('index.html')
 def adminpage():return app.send_static_file('admin.html')
 @app.post('/api/login')
 def login():
- d=request.get_json(silent=True) or {};c=db();u=c.execute('SELECT * FROM users WHERE username=?',(str(d.get('username','')),)).fetchone();c.close()
+ d=request.get_json(silent=True) or {}
+ username=str(d.get('username','')).strip()
+ supplied=str(d.get('password',''))
+ c=db()
+ u=c.execute('SELECT * FROM users WHERE username=?',(username,)).fetchone()
  ip=request.remote_addr or 'unknown'; now=time.time()
  attempts=[t for t in LOGIN_FAILURES.get(ip,[]) if now-t<900]
- if len(attempts)>=8:return jsonify(error='登录尝试过多，请15分钟后再试'),429
- if not u or not check_password_hash(u['password_hash'],str(d.get('password',''))):
+ if len(attempts)>=8:
+  c.close()
+  return jsonify(error='登录尝试过多，请15分钟后再试'),429
+ env_user=os.environ.get('VYREX_ADMIN_USER','admin')
+ env_password=os.environ.get('VYREX_ADMIN_PASSWORD','')
+ valid=bool(u and check_password_hash(u['password_hash'],supplied))
+ # Permit the explicitly configured Render secret to recover a stale DB hash.
+ # This does not reset or delete any user or business data.
+ if u and not valid and username==env_user and env_password and len(env_password)>=12 and hmac.compare_digest(supplied,env_password):
+  valid=True
+  try:
+   c.execute('UPDATE users SET password_hash=? WHERE id=?',(generate_password_hash(env_password),u['id']))
+   c.commit()
+  except sqlite3.OperationalError:
+   c.rollback()
+ if not valid:
+  c.close()
   attempts.append(now);LOGIN_FAILURES[ip]=attempts
-  return jsonify(error='账号或密码错误'),401
+  return jsonify(error='账号或密码错误；请确认使用 Render 环境变量 VYREX_ADMIN_PASSWORD 的当前值'),401
+ c.close()
  LOGIN_FAILURES.pop(ip,None)
  session.clear();session['admin']=True;session['csrf']=secrets.token_urlsafe(24);return jsonify(ok=True,csrf=session['csrf'])
 @app.get('/api/me')
