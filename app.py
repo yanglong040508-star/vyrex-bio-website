@@ -39,6 +39,24 @@ def security_headers(response):
  response.headers['Cache-Control']='no-store' if request.path.startswith('/api/') or request.path=='/admin' else 'public, max-age=300'
  return response
 
+
+
+@app.errorhandler(404)
+def api_not_found(error):
+    if request.path.startswith('/api/'):
+        return jsonify(error=f'API 接口不存在：{request.path}，请确认 Render 已部署最新 app.py'),404
+    return error
+
+@app.errorhandler(Exception)
+def api_error_json(error):
+    if request.path.startswith('/api/'):
+        app.logger.exception('API request failed: %s %s', request.method, request.path)
+        from werkzeug.exceptions import HTTPException
+        if isinstance(error, HTTPException):
+            return jsonify(error=error.description),error.code
+        return jsonify(error='服务器内部错误；详细原因已记录在 Render Logs，请检查对应 API 请求'),500
+    raise error
+
 # Basic origin protection for mutating requests (CSRF tokens protect logged-in writes).
 @app.before_request
 def check_origin():
