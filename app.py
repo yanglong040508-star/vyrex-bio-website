@@ -298,11 +298,12 @@ def add_products_batch():
    name=str(item.get('name','')).strip();spec=str(item.get('spec','')).strip();cat=str(item.get('cat','Peptides')).strip()
    if not name or not spec or cat not in CATS:
     raise ValueError(f'第{index}行：请填写英文名称、分类和规格')
-   values=dict(item);values.update({'code':'','name':name,'spec':spec,'cat':cat})
+   # Allocate a valid unique code before validation. valid_product requires
+   # a non-empty code, so passing an empty string here caused every batch
+   # insert to fail with the code-format validation message.
+   values=dict(item)
+   values.update({'code':next_product_code(c),'name':name,'spec':spec,'cat':cat})
    v=list(valid_product(values))
-   # Allocate each code while holding the write lock; existing rows and
-   # earlier rows in this batch are both included in the next-code query.
-   v[0]=next_product_code(c)
    cur=c.execute('INSERT INTO products(code,name,spec,cat,unit_price,bulk_price,visible) VALUES(?,?,?,?,?,?,?)',tuple(v))
    created.append({'id':cur.lastrowid,'code':v[0],'name':name})
   c.commit()
