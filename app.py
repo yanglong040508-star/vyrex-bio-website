@@ -22,7 +22,7 @@ def db():
 def init():
  c=db();c.executescript('''CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY,username TEXT UNIQUE,password_hash TEXT);
  CREATE TABLE IF NOT EXISTS products(id INTEGER PRIMARY KEY,code TEXT UNIQUE NOT NULL,name TEXT NOT NULL,spec TEXT NOT NULL,cat TEXT NOT NULL,unit_price REAL,bulk_price REAL,image TEXT,coa TEXT,visible INTEGER NOT NULL DEFAULT 1,updated_at TEXT DEFAULT CURRENT_TIMESTAMP);
- CREATE TABLE IF NOT EXISTS inquiries(id INTEGER PRIMARY KEY,customer_name TEXT NOT NULL,email TEXT NOT NULL,message TEXT,items_json TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'new',created_at TEXT DEFAULT CURRENT_TIMESTAMP); CREATE TABLE IF NOT EXISTS settings(k TEXT PRIMARY KEY,v TEXT NOT NULL DEFAULT '');''')
+ CREATE TABLE IF NOT EXISTS inquiries(id INTEGER PRIMARY KEY,customer_name TEXT NOT NULL,email TEXT NOT NULL,message TEXT,items_json TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'new',created_at TEXT DEFAULT CURRENT_TIMESTAMP); CREATE TABLE IF NOT EXISTS settings(k TEXT PRIMARY KEY,v TEXT NOT NULL DEFAULT ''); CREATE TABLE IF NOT EXISTS contacts(id INTEGER PRIMARY KEY AUTOINCREMENT,kind TEXT NOT NULL,label TEXT NOT NULL,value TEXT NOT NULL,is_primary INTEGER NOT NULL DEFAULT 0,sort_order INTEGER NOT NULL DEFAULT 0,visible INTEGER NOT NULL DEFAULT 1);''')
  if not c.execute('SELECT 1 FROM users').fetchone():
   username=os.environ.get('VYREX_ADMIN_USER','admin')
   password=os.environ.get('VYREX_ADMIN_PASSWORD')
@@ -110,25 +110,71 @@ def change_password():
  session.clear()
  return jsonify(ok=True,message='密码修改成功，请使用新密码重新登录',relogin=True)
 
+def migrate_legacy_contacts(c):
+    # Preserve the previous single-contact settings when upgrading the database.
+    if c.execute('SELECT COUNT(*) FROM contacts').fetchone()[0]:
+        return
+    old={r['k']:r['v'] for r in c.execute("SELECT k,v FROM settings WHERE k IN ('whatsapp','email','phone','telegram','address','hours')").fetchall()}
+    legacy=[('whatsapp','WhatsApp','WhatsApp'),('telegram','Telegram','Telegram'),('email','Email','Email'),('phone','Phone','Phone'),('address','Location','Other'),('hours','Business hours','Other')]
+    order=0
+    for key,label,kind in legacy:
+        value=str(old.get(key,'')).strip()
+        if value:
+            c.execute('INSERT INTO contacts(kind,label,value,is_primary,sort_order,visible) VALUES(?,?,?,?,?,1)',(kind,label,value,1 if order==0 else 0,order))
+            order+=1
+
+def contact_rows(public_only=False):
+    c=db()
+    migrate_legacy_contacts(c);c.commit()
+    sql='SELECT id,kind,label,value,is_primary,sort_order,visible FROM contacts'
+    if public_only and not session.get('admin'):
+        sql+=' WHERE visible=1'
+    rows=[dict(r) for r in c.execute(sql+' ORDER BY sort_order ASC,id ASC').fetchall()]
+    c.close()
+    return rows
+
+def validate_contacts(items):
+    if not isinstance(items,list): raise ValueError('联系方式数据必须是列表')
+    clean=[]
+    allowed={'WhatsApp','Telegram','Email','Phone','Website','Other'}
+    for i,item in enumerate(items):
+        if not isinstance(item,dict): raise ValueError(f'第{i+1}项格式错误')
+        kind=str(item.get('kind','')).strip();label=str(item.get('label','')).strip();value=str(item.get('value','')).strip()
+        if kind not in allowed: raise ValueError(f'第{i+1}项联系方式类型无效')
+        if not label or len(label)>80: raise ValueError(f'第{i+1}项请填写名称（最多80字符）')
+        if not value or len(value)>300: raise ValueError(f'第{i+1}项请填写内容（最多300字符）')
+        if kind=='Email' and ('@' not in value or ' ' in value or value.startswith('@') or value.endswith('@')):
+            raise ValueError(f'第{i+1}项邮箱格式不正确')
+        if kind=='WhatsApp' and not (value.startswith('+') and value[1:].isdigit() and 8<=len(value[1:])<=15):
+            raise ValueError(f'第{i+1}项 WhatsApp 请使用国际格式，例如 +14155552671')
+        if kind=='Telegram':
+            v=value.removeprefix('@')
+            if not (v.startswith('https://t.me/') or (v.replace('_','').isalnum() and 5<=len(v)<=32)):
+                raise ValueError(f'第{i+1}项 Telegram 请填写用户名或 https://t.me/ 链接')
+        if kind=='Website' and not (value.startswith('https://') and len(value)>8):
+            raise ValueError(f'第{i+1}项网站链接必须以 https:// 开头')
+        clean.append({'kind':kind,'label':label,'value':value,'is_primary':bool(item.get('is_primary')),'visible':bool(item.get('visible',True)),'sort_order':i})
+    if clean and not any(x['is_primary'] for x in clean): clean[0]['is_primary']=True
+    if sum(1 for x in clean if x['is_primary'])>1: raise ValueError('只能设置一个主要联系方式')
+    return clean
+
 @app.get('/api/contact')
 def get_contact():
- c=db();rows=c.execute("SELECT k,v FROM settings WHERE k IN ('whatsapp','email','phone','telegram','address','hours')").fetchall();c.close()
- return jsonify({**{k:'' for k in ('whatsapp','email','phone','telegram','address','hours')},**{r['k']:r['v'] for r in rows}})
+    return jsonify(contacts=contact_rows(public_only=True))
+
 @app.put('/api/contact')
 @admin_required
 @csrf_required
 def save_contact():
- d=request.get_json(silent=True) or {}
- keys=('whatsapp','email','phone','telegram','address','hours')
- if not isinstance(d,dict):return jsonify(error='数据格式错误'),400
- vals={k:str(d.get(k,'')).strip() for k in keys}
- if any(len(v)>300 for v in vals.values()):return jsonify(error='每项最多300字符'),400
- if vals['email'] and ('@' not in vals['email'] or ' ' in vals['email']):return jsonify(error='邮箱格式不正确'),400
- if vals['whatsapp'] and not vals['whatsapp'].lstrip('+').isdigit():return jsonify(error='WhatsApp 请输入国家代码和电话号码，例如 +12345678900'),400
- c=db()
- with c:
-  c.executemany('INSERT INTO settings(k,v) VALUES(?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v',vals.items())
- c.close();return jsonify(ok=True)
+    d=request.get_json(silent=True) or {}
+    try: clean=validate_contacts(d.get('contacts'))
+    except ValueError as e: return jsonify(error=str(e)),400
+    c=db()
+    with c:
+        c.execute('DELETE FROM contacts')
+        c.executemany('INSERT INTO contacts(kind,label,value,is_primary,sort_order,visible) VALUES(:kind,:label,:value,:is_primary,:sort_order,:visible)',clean)
+    c.close()
+    return jsonify(ok=True,count=len(clean))
 @app.get('/api/products')
 def products():
  c=db();rows=c.execute('SELECT * FROM products '+('' if session.get('admin') else 'WHERE visible=1 ')+'ORDER BY id DESC').fetchall();c.close()
