@@ -279,6 +279,43 @@ def add_product():
  finally:
   if c:
    c.close()
+@app.post('/api/products/batch')
+@admin_required
+@csrf_required
+def add_products_batch():
+ d=request.get_json(silent=True) or {}
+ items=d.get('products')
+ if not isinstance(items,list) or not items:
+  return jsonify(error='请至少填写一款产品'),400
+ if len(items)>200:
+  return jsonify(error='单次最多批量添加200款产品'),400
+ c=db();created=[]
+ try:
+  c.execute('BEGIN IMMEDIATE')
+  for index,item in enumerate(items,1):
+   if not isinstance(item,dict):
+    raise ValueError(f'第{index}行格式不正确')
+   name=str(item.get('name','')).strip();spec=str(item.get('spec','')).strip();cat=str(item.get('cat','Peptides')).strip()
+   if not name or not spec or cat not in CATS:
+    raise ValueError(f'第{index}行：请填写英文名称、分类和规格')
+   values=dict(item);values.update({'code':'','name':name,'spec':spec,'cat':cat})
+   v=list(valid_product(values))
+   # Allocate each code while holding the write lock; existing rows and
+   # earlier rows in this batch are both included in the next-code query.
+   v[0]=next_product_code(c)
+   cur=c.execute('INSERT INTO products(code,name,spec,cat,unit_price,bulk_price,visible) VALUES(?,?,?,?,?,?,?)',tuple(v))
+   created.append({'id':cur.lastrowid,'code':v[0],'name':name})
+  c.commit()
+  return jsonify(ok=True,count=len(created),products=created)
+ except ValueError as e:
+  c.rollback();return jsonify(error=str(e)),400
+ except sqlite3.IntegrityError:
+  c.rollback();return jsonify(error='产品编号冲突，请重试；本批次没有写入任何产品'),409
+ except sqlite3.OperationalError:
+  c.rollback();return jsonify(error='数据库暂时繁忙，请稍后重试；本批次没有写入任何产品'),503
+ finally:
+  c.close()
+
 @app.put('/api/products/<int:pid>')
 @admin_required
 @csrf_required
