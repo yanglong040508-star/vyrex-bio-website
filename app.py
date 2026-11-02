@@ -39,24 +39,6 @@ def security_headers(response):
  response.headers['Cache-Control']='no-store' if request.path.startswith('/api/') or request.path=='/admin' else 'public, max-age=300'
  return response
 
-
-
-@app.errorhandler(404)
-def api_not_found(error):
-    if request.path.startswith('/api/'):
-        return jsonify(error=f'API 接口不存在：{request.path}，请确认 Render 已部署最新 app.py'),404
-    return error
-
-@app.errorhandler(Exception)
-def api_error_json(error):
-    if request.path.startswith('/api/'):
-        app.logger.exception('API request failed: %s %s', request.method, request.path)
-        from werkzeug.exceptions import HTTPException
-        if isinstance(error, HTTPException):
-            return jsonify(error=error.description),error.code
-        return jsonify(error='服务器内部错误；详细原因已记录在 Render Logs，请检查对应 API 请求'),500
-    raise error
-
 # Basic origin protection for mutating requests (CSRF tokens protect logged-in writes).
 @app.before_request
 def check_origin():
@@ -91,9 +73,20 @@ def login():
  ip=request.remote_addr or 'unknown'; now=time.time()
  attempts=[t for t in LOGIN_FAILURES.get(ip,[]) if now-t<900]
  if len(attempts)>=8:return jsonify(error='登录尝试过多，请15分钟后再试'),429
- if not u or not check_password_hash(u['password_hash'],str(d.get('password',''))):
+ supplied=str(d.get('password',''))
+ valid=bool(u and check_password_hash(u['password_hash'],supplied))
+ # Recovery path: if the entered password matches the explicitly configured
+ # Render environment secret, synchronize the stored hash without deleting data.
+ env_password=os.environ.get('VYREX_ADMIN_PASSWORD','')
+ if u and not valid and env_password and len(env_password)>=12 and secrets.compare_digest(supplied,env_password):
+  c=db()
+  c.execute('UPDATE users SET password_hash=? WHERE id=?',(generate_password_hash(env_password),u['id']))
+  c.commit()
+  c.close()
+  valid=True
+ if not valid:
   attempts.append(now);LOGIN_FAILURES[ip]=attempts
-  return jsonify(error='账号或密码错误'),401
+  return jsonify(error='账号或密码错误；如刚修改 Render 环境变量，请确认已重新部署'),401
  LOGIN_FAILURES.pop(ip,None)
  session.clear();session['admin']=True;session['csrf']=secrets.token_urlsafe(24);return jsonify(ok=True,csrf=session['csrf'])
 @app.get('/api/me')
