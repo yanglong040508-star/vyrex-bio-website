@@ -22,7 +22,7 @@ if (location.protocol === 'file:') {
 <div id="recognizePreview" class="hidden" style="margin-top:14px">
  <h3 style="margin:8px 0">识别结果预览</h3>
  <p class="muted">请检查名称、分类、规格和价格。识别不确定的内容可在下方批量文本框中修改。确认后点击“转入批量添加”，再由你决定是否保存。</p>
- <div class="tablewrap"><table style="min-width:700px"><thead><tr><th>产品名称</th><th>分类</th><th>规格</th><th>单价</th><th>整盒价</th></tr></thead><tbody id="recognizeRows"></tbody></table></div>
+ <div class="tablewrap"><table style="min-width:700px"><thead><tr><th>产品名称</th><th>分类</th><th>规格</th><th>单价</th><th>整盒价</th></tr></thead><tbody id="recognizeRows"></tbody></table></div><div id="recognizeSkippedWrap" class="hidden" style="margin-top:12px"><h3>已跳过的异常行</h3><p class="muted">这些行没有有效产品代码或规格，不会导入数据库。</p><ul id="recognizeSkippedRows"></ul></div>
  <div class="flex" style="margin-top:12px"><button type="button" id="recognizeApplyBtn">转入批量添加</button><button type="button" class="secondary" id="recognizeRetryBtn">重新识别</button></div>
 </div>
 </div>
@@ -98,60 +98,69 @@ function inferCategory(line){
  return $('recognizeDefaultCat').value;
 }
 function cleanPrice(v){if(v==null||v==='')return '';const n=String(v).replace(/[$,]/g,'').trim();return /^\d+(\.\d{1,2})?$/.test(n)?n:''}
-function normalizeCatalogSpec(value){
- const s=String(value||'').replace(/\s+/g,' ').trim();
- // Product-name text may be merged into the specification column by PDF/OCR.
- // Keep only the specification beginning at its first numeric strength.
- const m=s.match(/\d+(?:\.\d+)?\s*(?:mg|mcg|μg|g|ml|iu)\b(?:\s*\/\s*(?:ml|mL))?(?:\s*[-–—×x]\s*\d+(?:\.\d+)?\s*(?:ml|mL|vials?|tabs?|tablets?))?/i);
- return m ? m[0].replace(/\s+/g,' ').trim() : s;
-}
 function parseRecognizedText(text){
  const lines=String(text||'').replace(/\u00a0/g,' ').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
- const output=[];
+ const output=[], skipped=[];
  const header=/^(code|product\s*name|name|specification|price\s*\/\s*vial|price|产品代码|产品名称|规格|价格)/i;
- for(const line0 of lines){
-  let line=line0.replace(/[•●▪]/g,' ').trim();
+ const validCode=/^[A-Z0-9][A-Z0-9_-]{1,15}$/i;
+ const isCategory=x=>/^(peptides?|oils?|tablets?|肽类?|肽|油剂?|油|片剂?)$/i.test(String(x||'').trim());
+ const categoryValue=x=>({peptide:'Peptides',peptides:'Peptides',肽类:'Peptides',肽:'Peptides',oil:'Oils',oils:'Oils',油剂:'Oils',油:'Oils',tablet:'Tablets',tablets:'Tablets',片剂:'Tablets'})[String(x||'').trim().toLowerCase()]||'';
+ const isSpec=x=>/\b\d+(?:\.\d+)?\s*(?:mg|mcg|μg|g|ml|iu)\b/i.test(String(x||''))||/\b\d+\s*(?:vials?|tablets?|tabs?)\b/i.test(String(x||''));
+ const priceValue=x=>{
+  const t=String(x||'').trim();
+  if(!t||/询价|quote|n\/a|—|-/i.test(t))return '';
+  const m=t.match(/\$?\s*(\d+(?:,\d{3})*(?:\.\d{1,2})?)/);
+  return m?m[1].replace(/,/g,''):'';
+ };
+ for(const raw of lines){
+  const line=raw.replace(/[•●▪]/g,' ').trim();
   if(header.test(line)||/PRODUCT PRICE CATALOG|OIL PRODUCTS|PEPTIDE PRODUCTS|TABLET PRODUCTS|^page\s+\d+/i.test(line))continue;
+
+  // Keep empty columns: they are meaningful for missing prices and OCR column alignment.
   let cells=line.split(/\s*\|\s*|\t+|;+/).map(x=>x.trim());
-  cells=cells.filter((x,i)=>x!=='' || i===0);
-  let name='',cat=$('recognizeDefaultCat').value,spec='',unit='',bulk='';
-  // Structured catalog row: CODE | PRODUCT NAME | SPECIFICATION | PRICE/VIAL.
-  if(cells.length>=4 && /^[A-Z0-9][A-Z0-9_-]{1,15}$/i.test(cells[0]) && /(?:mg|mcg|ml|iu)\b/i.test(cells[2])){
-   // User rule: use CODE as the product name and ignore PRODUCT NAME.
-   name=cells[0];spec=normalizeCatalogSpec(cells[2]);unit=cleanPrice(cells[3]);bulk='';
-  }else if(cells.length>=3){
-   const ci=cells.findIndex(x=>/^(peptides?|oils?|tablets?|肽类?|油剂?|片剂?)$/i.test(x));
-   if(ci>=0){
-    name=cells.slice(0,ci).join(' ').trim();cat=inferCategory(cells[ci]);spec=cells[ci+1]||'';
-    const prices=cells.slice(ci+2).map(cleanPrice).filter(x=>x!=='');unit=prices[0]||'';bulk=prices[1]||'';
-   }else{
-    // Generic spreadsheet row: name | specification | unit price | optional bulk price.
-    name=cells[0];spec=cells[1]||'';unit=cleanPrice(cells[2]);bulk=cleanPrice(cells[3]||'');
-    cat=inferCategory(line);
+  while(cells.length && cells[0]==='')cells.shift();
+  while(cells.length && cells[cells.length-1]==='')cells.pop();
+  if(!cells.length)continue;
+
+  const code=cells[0].toUpperCase();
+  // Only a short, standalone code in the first table column can become a product.
+  // This rejects ingredient/formula fragments such as "Sodium Chloride..." or "| (5%) /mL...".
+  if(!validCode.test(code)||/^(CODE|PRODUCT|NAME|SPEC|PRICE|USD|PAGE)$/i.test(code)){
+   skipped.push(raw);continue;
+  }
+
+  let cat='',spec='',unit='',bulk='';
+  const catIndex=cells.findIndex((v,i)=>i>0&&isCategory(v));
+  if(catIndex>=0){
+   cat=categoryValue(cells[catIndex]);
+   spec=cells.slice(catIndex+1).find(isSpec)||'';
+   const specIndex=cells.findIndex((v,i)=>i>catIndex&&v===spec);
+   const priceCells=specIndex>=0?cells.slice(specIndex+1):[];
+   const prices=priceCells.map(priceValue).filter(v=>v!=='');
+   unit=prices[0]||'';bulk=prices[1]||'';
+  }else{
+   // Common source catalog: CODE | PRODUCT NAME | SPECIFICATION | PRICE/VIAL.
+   // The PRODUCT NAME column is intentionally ignored; CODE is the admin product name.
+   if(cells.length>=3 && isSpec(cells[2])){
+    spec=cells[2];unit=priceValue(cells[3]);bulk=priceValue(cells[4]);cat=inferCategory(line);
+   }else if(cells.length>=2 && isSpec(cells[1])){
+    spec=cells[1];unit=priceValue(cells[2]);bulk=priceValue(cells[3]);cat=inferCategory(line);
    }
   }
-  if(!name||!spec){
-   // Conservative fallback for pasted plain text; skip catalog headings and incomplete fragments.
-   const specMatch=line.match(/\b\d+(?:\.\d+)?\s*(?:mg|mcg|μg|g|ml|iu)\b(?:\s*[×x*]\s*\d+\s*(?:vials?|tabs?|tablets?|bottles?|盒|瓶))?/i)
-     || line.match(/\b\d+\s*(?:vials?|tablets?|tabs?)\b/i);
-   if(!specMatch)continue;
-   spec=specMatch[0].trim();
-   const prices=[...line.matchAll(/\$\s*(\d+(?:\.\d{1,2})?)/g)].map(m=>cleanPrice(m[1]));
-   unit=prices[0]||'';bulk=prices[1]||'';
-   let rest=line.replace(specMatch[0],' ').replace(/\$\s*\d+(?:\.\d{1,2})?/g,' ');
-   rest=rest.replace(/\b(Peptides?|Oils?|Tablets?)\b/ig,' ').replace(/肽类?|油剂?|片剂?/g,' ').replace(/\s+/g,' ').trim();
-   name=rest.replace(/^[-–—:：,，]+|[-–—:：,，]+$/g,'');
-   cat=inferCategory(line);
+
+  if(!spec){
+   skipped.push(raw);continue;
   }
-  name=name.replace(/^[\s\-–—:：]+|[\s\-–—:：]+$/g,'').trim();
-  spec=spec.trim();
-  if(name.length>150)name=name.slice(0,150);
-  // Reject obvious headers and broken rows instead of presenting them as products.
-  if(name && spec && !/^(PRODUCT PRICE CATALOG|CODE|PRODUCT NAME)$/i.test(name) && !/^USD\s+Page/i.test(spec)){
-   spec=normalizeCatalogSpec(spec);output.push({name,cat:cat||$('recognizeDefaultCat').value,spec,unit_price:unit,bulk_price:bulk});
-  }
+  cat=cat||inferCategory(line)||$('recognizeDefaultCat').value;
+  output.push({name:code,cat,spec:spec.trim(),unit_price:unit,bulk_price:bulk});
  }
- const seen=new Set();return output.filter(p=>{const k=[p.name,p.cat,p.spec,p.unit_price,p.bulk_price].join('|').toLowerCase();if(seen.has(k))return false;seen.add(k);return true});
+ const seen=new Set();
+ const unique=output.filter(p=>{
+  const k=[p.name,p.cat,p.spec,p.unit_price,p.bulk_price].join('|').toLowerCase();
+  if(seen.has(k)){skipped.push(p.name+'（重复行）');return false}
+  seen.add(k);return true;
+ });
+ return {products:unique,skipped};
 }
 async function extractPdf(file){
  await loadExternalScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
@@ -206,7 +215,7 @@ async function extractImage(file){
   return cols.join(' | ');
  }).join('\n');
 }
-$('recognizeClearBtn').onclick=()=>{$('recognizePaste').value='';$('recognizeFile').value='';$('recognizeStatus').textContent='';$('recognizePreview').classList.add('hidden');recognizedProducts=[]};
+$('recognizeClearBtn').onclick=()=>{$('recognizePaste').value='';$('recognizeFile').value='';$('recognizeStatus').textContent='';$('recognizePreview').classList.add('hidden');$('recognizeSkippedWrap').classList.add('hidden');recognizedProducts=[]};
 $('recognizeRetryBtn').onclick=()=>$('recognizeBtn').click();
 $('recognizeBtn').onclick=async()=>{
  const btn=$('recognizeBtn');btn.disabled=true;$('recognizeStatus').textContent='正在读取资料…';
@@ -221,10 +230,13 @@ $('recognizeBtn').onclick=async()=>{
    else throw new Error('暂不支持该文件格式');
   }
   if(!text.trim())throw new Error('请上传文件或粘贴产品资料');
-  recognizedProducts=parseRecognizedText(text);
-  if(!recognizedProducts.length)throw new Error('没有识别到完整的产品名称和规格。请尝试粘贴表格文字，或检查图片清晰度。');
+  const parsed=parseRecognizedText(text);
+  recognizedProducts=parsed.products;
+  if(!recognizedProducts.length)throw new Error('没有识别到有效产品代码和规格。异常行已过滤；请检查原表格是否包含 CODE 和 SPECIFICATION 列。');
   $('recognizeRows').innerHTML=recognizedProducts.map(p=>`<tr><td>${esc(p.name)}</td><td>${esc(p.cat)}</td><td>${esc(p.spec)}</td><td>${p.unit_price?'$'+esc(p.unit_price):'询价'}</td><td>${p.bulk_price?'$'+esc(p.bulk_price):'询价'}</td></tr>`).join('');
-  $('recognizePreview').classList.remove('hidden');$('recognizeStatus').textContent=`识别完成：${recognizedProducts.length} 款。请核对预览后再转入批量添加。`;
+  $('recognizeSkippedRows').innerHTML=parsed.skipped.map(x=>`<li>${esc(x)}</li>`).join('');
+  $('recognizeSkippedWrap').classList.toggle('hidden',parsed.skipped.length===0);
+  $('recognizePreview').classList.remove('hidden');$('recognizeStatus').textContent=`识别完成：有效产品 ${recognizedProducts.length} 款；跳过异常行 ${parsed.skipped.length} 条。请核对后再转入批量添加。`;
  }catch(e){$('recognizeStatus').textContent=e.message;msg(e.message)}
  finally{btn.disabled=false}
 };
